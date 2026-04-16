@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · Smart Parking{% endblock %}
+{% block content %}
+<div class="dashboard-grid">
+  <div class="card span-2">
+    <h1>Welcome, {{ user.full_name }}</h1>
+    <p class="meta">Wallet balance: <span class="balance-pill">₹ {{ "%.2f"|format(balance|float) }}</span> · Display TZ: {{ tz_label }}</p>
+    <p class="meta" style="margin-top:0.75rem;">
+      <a href="{{ url_for('predictions_view') }}" class="btn btn-secondary">View Predictions</a>
+    </p>
+    {% if notice == 'cancelled' %}
+    <div class="alert alert-success" role="status">Booking cancelled. Your prepaid amount was refunded to the wallet and the slot was freed.</div>
+    {% elif notice == 'extended' %}
+    <div class="alert alert-success" role="status">Booking extended. New end time is shown below; your QR was updated.</div>
+    {% elif notice == 'no_balance' %}
+    <div class="alert alert-error" role="alert">Not enough wallet balance to extend. Top up and try again.</div>
+    {% elif notice == 'invalid_extend' %}
+    <div class="alert alert-error" role="alert">Enter a valid extension (hours between 0.25 and 168).</div>
+    {% elif notice == 'booking_not_found' %}
+    <div class="alert alert-error" role="alert">That booking could not be found or is no longer active.</div>
+    {% endif %}
+  </div>
+
+  {% if warnings %}
+  <div class="card span-2">
+    <h2>Alerts</h2>
+    {% for w in warnings %}
+    <div class="alert alert-warn" role="status" data-booking-warning="{{ w.booking_id }}">
+      <strong>Your booking will expire soon</strong> — booking #{{ w.booking_id }} · about {{ w.minutes_left }} min left
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="card span-2">
+    <h2>Active bookings</h2>
+    <p class="meta">Each vehicle can have only one active booking. Use <strong>Extend time</strong> to add hours or <strong>Cancel booking</strong> to free the slot and refund the prepaid amount.</p>
+    {% if not bookings %}
+    <p class="meta">No active bookings. <a href="{{ url_for('book_page') }}">Book a slot</a></p>
+    {% else %}
+    <div class="booking-list">
+      {% for b in bookings %}
+      <div class="booking-item booking-item-with-actions" data-booking-id="{{ b.id }}">
+        <div class="booking-item-main">
+          <strong>Slot {{ b.slot }}</strong> · {{ b.plate }}<br>
+          <span class="meta">Ends (local): {{ b.end_local.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span class="meta"> · ₹{{ b.price_per_hour }}/hr</span><br>
+          <span class="meta status-line" id="status-{{ b.id }}">
+            {% if b.warning %}
+            <span class="alert-warn" style="display:inline;padding:0.2rem 0.5rem;border-radius:6px;font-size:0.85rem;">Your booking will expire soon</span>
+            {% endif %}
+          </span>
+          <div class="booking-manage">
+            <form method="post" action="{{ url_for('extend_booking', booking_id=b.id) }}" class="extend-form">
+              <label class="extend-label"><span class="sr-only">Hours to add</span>
+                <input type="number" name="extend_hours" min="0.25" max="168" step="0.25" value="1" required class="extend-input" title="Extra hours">
+              </label>
+              <button type="submit" class="btn btn-secondary btn-sm">Extend time</button>
+            </form>
+            <form method="post" action="{{ url_for('cancel_booking', booking_id=b.id) }}" class="cancel-form" onsubmit="return confirm('Cancel this booking? The slot will be freed and your prepaid amount will be refunded to your wallet.');">
+              <button type="submit" class="btn btn-ghost btn-sm btn-danger-outline">Cancel booking</button>
+            </form>
+          </div>
+        </div>
+        <div class="actions-row booking-quick-links" style="margin:0;justify-content:flex-end;">
+          <a class="btn btn-secondary" href="{{ url_for('booking_preview', booking_id=b.id) }}">Preview</a>
+          <a class="btn btn-primary" href="{{ url_for('booking_success', booking_id=b.id) }}">QR</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const ids = [{% for b in bookings %}{{ b.id }}{% if not loop.last %},{% endif %}{% endfor %}];
+  async function poll() {
+    for (const id of ids) {
+      try {
+        const r = await fetch('/booking/' + id + '/status', { credentials: 'same-origin' });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const el = document.getElementById('status-' + id);
+        if (el && j.warning) {
+          el.innerHTML = '<span class="alert-warn" style="display:inline;padding:0.2rem 0.5rem;border-radius:6px;font-size:0.85rem;">Your booking will expire soon</span>';
+        }
+      } catch (e) {}
+    }
+  }
+  if (ids.length) { setInterval(poll, 30000); poll(); }
+})();
+</script>
+{% endblock %}

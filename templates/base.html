@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Smart Parking{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+  <div class="layout">
+    <header class="site-header">
+      <a class="brand" href="{{ url_for('dashboard') }}">Smart Parking</a>
+      <nav class="nav" aria-label="Main">
+        {% if user is defined and user %}
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('book_page') }}">Book slot</a>
+        <a href="{{ url_for('vehicles_page') }}">Vehicles</a>
+        <a href="{{ url_for('wallet_page') }}">Wallet</a>
+        <a href="{{ url_for('exit_page') }}">Exit</a>
+        <form action="{{ url_for('logout') }}" method="post" style="display:inline;">
+          <button type="submit" class="btn btn-ghost" style="font-size:0.9rem;">Log out</button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('login_page') }}">Log in</a>
+        <a href="{{ url_for('register_page') }}">Register</a>
+        <a href="{{ url_for('exit_page') }}">Exit (kiosk)</a>
+        {% endif %}
+      </nav>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">Times shown in local zone where noted · UTC stored server-side</footer>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

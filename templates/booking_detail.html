@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Booking #{{ booking.id }} · Smart Parking{% endblock %}
+{% block content %}
+<div class="centered-form-page">
+<div class="card" style="max-width:560px;">
+  <h1>Booking #{{ booking.id }}</h1>
+  <p class="meta">Display times in {{ tz_label }}</p>
+  <dl style="display:grid;gap:0.75rem;">
+    <div><dt class="meta">Vehicle</dt><dd><strong>{{ booking.vehicle.plate_number }}</strong></dd></div>
+    <div><dt class="meta">Slot</dt><dd><strong>{{ booking.slot.slot_number }}</strong></dd></div>
+    <div><dt class="meta">Start (local)</dt><dd>{{ start_local.strftime('%Y-%m-%d %H:%M') }}</dd></div>
+    <div><dt class="meta">End (local)</dt><dd>{{ end_local.strftime('%Y-%m-%d %H:%M') }}</dd></div>
+    <div><dt class="meta">Price / hour</dt><dd>₹ {{ booking.price_per_hour }}</dd></div>
+    <div><dt class="meta">Base price</dt><dd>₹ {{ booking.base_price }}</dd></div>
+    <div><dt class="meta">Extra charge</dt><dd>₹ {{ booking.extra_charge }}</dd></div>
+    <div><dt class="meta">Status</dt><dd>{{ booking.status.value }}</dd></div>
+    {% if booking.actual_exit_time %}
+    <div><dt class="meta">Actual exit (UTC)</dt><dd>{{ booking.actual_exit_time.isoformat() }}</dd></div>
+    {% endif %}
+  </dl>
+  <div class="actions-row">
+    <a class="btn btn-secondary" href="{{ url_for('booking_preview', booking_id=booking.id) }}">Preview & QR</a>
+    <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Dashboard</a>
+  </div>
+</div>
+</div>
+{% endblock %}

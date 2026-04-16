@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Booking preview #{{ booking.id }} · Smart Parking{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Booking preview</h1>
+  <p class="meta">Timezone for display: {{ tz_label }}</p>
+  <div class="preview-layout">
+    {% if qr_url %}
+    <div>
+      <img class="qr-large" src="{{ qr_url }}" alt="Booking QR code" width="280" height="280">
+    </div>
+    {% endif %}
+    <div>
+      <h2>Details</h2>
+      <p><strong>Vehicle number</strong><br>{{ booking.vehicle.plate_number }}</p>
+      <p><strong>Slot</strong><br>{{ booking.slot.slot_number }}</p>
+      <p><strong>Start (local)</strong><br>{{ start_local.strftime('%Y-%m-%d %H:%M') }}</p>
+      <p><strong>End (local)</strong><br>{{ end_local.strftime('%Y-%m-%d %H:%M') }}</p>
+      <p><strong>Price per hour</strong><br>₹ {{ booking.price_per_hour }}</p>
+      <p><strong>Base price</strong><br>₹ {{ booking.base_price }}</p>
+      <p><strong>Status</strong><br>{{ booking.status.value }}</p>
+      <div class="actions-row">
+        {% if qr_url %}
+        <a class="btn btn-primary" href="{{ url_for('booking_qr_download', booking_id=booking.id) }}" download>Download QR</a>
+        {% endif %}
+        <a class="btn btn-secondary" href="{{ url_for('booking_detail', booking_id=booking.id) }}">View booking details</a>
+        <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Dashboard</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

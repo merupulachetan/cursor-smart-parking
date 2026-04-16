@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Vehicle registration · Smart Parking{% endblock %}
+{% block content %}
+<div class="vehicle-reg-page">
+  <div class="vehicle-reg-stepper" aria-label="Registration progress">
+    <div class="step done">
+      <span class="step-dot" aria-hidden="true">✓</span>
+      <span>Account</span>
+    </div>
+    <span class="step-line" aria-hidden="true"></span>
+    <div class="step active">
+      <span class="step-dot" aria-hidden="true">2</span>
+      <span>Vehicle</span>
+    </div>
+    <!-- <span class="step-line" aria-hidden="true"></span> -->
+    <!-- <div class="step">
+      <span class="step-dot" aria-hidden="true">3</span>
+      <span>Wallet</span>
+    </div> -->
+  </div>
+
+  <div class="vehicle-reg-layout">
+    <div class="vehicle-reg-card">
+      <p class="vehicle-reg-eyebrow">Vehicle registration</p>
+      <h1 class="vehicle-reg-title">Add your vehicle</h1>
+      <p class="vehicle-reg-sub">Select type, brand, and model. Fields stay aligned in two columns on larger screens.</p>
+
+      {% if just_added %}
+      <div class="alert alert-success" role="status">Vehicle saved. You can add another or continue to wallet.</div>
+      {% endif %}
+      {% if error %}
+      <div class="alert alert-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('vehicles_add') }}" id="vehicle-reg-form" novalidate>
+        <div class="vehicle-form-grid">
+          <div class="vehicle-field">
+            <label for="vehicle_type">
+              <span class="field-label">Vehicle type</span>
+              <select id="vehicle_type" name="vehicle_type" required>
+                <option value="">Select type</option>
+              </select>
+            </label>
+          </div>
+          <div class="vehicle-field">
+            <label for="vehicle_subtype">
+              <span class="field-label">Sub-type / category</span>
+              <select id="vehicle_subtype" name="vehicle_subtype" required disabled>
+                <option value="">— select type first —</option>
+              </select>
+            </label>
+          </div>
+          <div class="vehicle-field">
+            <label for="brand">
+              <span class="field-label">Brand / company</span>
+              <select id="brand" name="brand" required disabled>
+                <option value="">— select type first —</option>
+              </select>
+            </label>
+          </div>
+          <div class="vehicle-field">
+            <label for="model">
+              <span class="field-label">Model</span>
+              <select id="model" name="model" required disabled>
+                <option value="">— select company first —</option>
+              </select>
+            </label>
+          </div>
+          <div class="vehicle-field">
+            <label for="plate_number">
+              <span class="field-label">Vehicle number plate</span>
+              <input type="text" id="plate_number" name="plate_number" required maxlength="32" placeholder="TN 01 AB 1234" autocomplete="off">
+              <span class="field-hint">Each plate can be registered only once in the system (not per account).</span>
+            </label>
+          </div>
+          <div class="vehicle-field">
+            <label for="color">
+              <span class="field-label">Color</span>
+              <input type="text" id="color" name="color" required maxlength="64" placeholder="White">
+            </label>
+          </div>
+        </div>
+
+        <div class="vehicle-reg-actions">
+          <a href="{{ url_for('dashboard') }}" class="back-link">← Back</a>
+          <button type="submit" class="btn-reg-add" name="after_save" value="stay">+ Add another vehicle</button>
+          <!-- <button type="submit" class="btn-reg-continue" name="after_save" value="wallet">Continue to Wallet →</button> -->
+        </div>
+      </form>
+
+      {% if vehicles %}
+      <div class="vehicle-list-card">
+        <h3>Your vehicles</h3>
+        {% for v in vehicles %}
+        <div class="vehicle-list-item">
+          <strong>{{ v.plate_number }}</strong>
+          {% if v.brand %} · {{ v.brand }} {{ v.model or '' }}{% elif v.label %} · {{ v.label }}{% endif %}
+          {% if v.vehicle_type %}<span class="meta"> · {{ v.vehicle_type }}{% if v.color %} · {{ v.color }}{% endif %}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <aside class="vehicle-reg-aside" aria-hidden="true">
+      {% if has_vehicle_side_image %}
+      <img class="aside-visual" src="{{ url_for('static', path='images/vehicle-side.jpg') }}" alt="">
+      {% else %}
+      <svg class="aside-visual" viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="20" y="58" width="160" height="36" rx="8" fill="rgba(255,255,255,0.12)"/>
+        <rect x="36" y="42" width="88" height="28" rx="6" fill="rgba(255,255,255,0.18)"/>
+        <circle cx="52" cy="98" r="14" fill="rgba(15,23,42,0.9)" stroke="rgba(255,255,255,0.2)"/>
+        <circle cx="148" cy="98" r="14" fill="rgba(15,23,42,0.9)" stroke="rgba(255,255,255,0.2)"/>
+        <path d="M168 70h20l8 24h-28V70z" fill="rgba(37,99,235,0.5)"/>
+      </svg>
+      {% endif %}
+      <p>Add accurate details for faster check-in and AI plate matching at exit.</p>
+    </aside>
+  </div>
+</div>
+
+<script type="application/json" id="vehicle-catalog-data">{{ catalog_json | safe }}</script>
+<script>
+(function () {
+  const el = document.getElementById('vehicle-catalog-data');
+  const CATALOG = el ? JSON.parse(el.textContent) : {};
+  const typeSel = document.getElementById('vehicle_type');
+  const subSel = document.getElementById('vehicle_subtype');
+  const brandSel = document.getElementById('brand');
+  const modelSel = document.getElementById('model');
+
+  function clearOptions(select, placeholder, disabled) {
+    select.innerHTML = '';
+    const o = document.createElement('option');
+    o.value = '';
+    o.textContent = placeholder;
+    select.appendChild(o);
+    select.disabled = disabled;
+    select.classList.toggle('disabled', disabled);
+  }
+
+  function fillTypes() {
+    clearOptions(typeSel, 'Select type', false);
+    Object.keys(CATALOG).sort().forEach(function (k) {
+      const o = document.createElement('option');
+      o.value = k;
+      o.textContent = k;
+      typeSel.appendChild(o);
+    });
+  }
+
+  function onTypeChange() {
+    const t = typeSel.value;
+    clearOptions(subSel, '— select type first —', !t);
+    clearOptions(brandSel, '— select type first —', !t);
+    clearOptions(modelSel, '— select company first —', true);
+    if (!t || !CATALOG[t]) return;
+    CATALOG[t].subtypes.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = s;
+      o.textContent = s;
+      subSel.appendChild(o);
+    });
+    subSel.disabled = false;
+    subSel.classList.remove('disabled');
+    const brands = CATALOG[t].brands || {};
+    Object.keys(brands).sort().forEach(function (b) {
+      const o = document.createElement('option');
+      o.value = b;
+      o.textContent = b;
+      brandSel.appendChild(o);
+    });
+    brandSel.disabled = false;
+    brandSel.classList.remove('disabled');
+  }
+
+  function onBrandChange() {
+    const t = typeSel.value;
+    const b = brandSel.value;
+    clearOptions(modelSel, '— select company first —', !b);
+    if (!t || !b || !CATALOG[t] || !CATALOG[t].brands[b]) return;
+    CATALOG[t].brands[b].forEach(function (m) {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      modelSel.appendChild(o);
+    });
+    modelSel.disabled = false;
+    modelSel.classList.remove('disabled');
+  }
+
+  fillTypes();
+  typeSel.addEventListener('change', onTypeChange);
+  brandSel.addEventListener('change', onBrandChange);
+})();
+</script>
+{% endblock %}

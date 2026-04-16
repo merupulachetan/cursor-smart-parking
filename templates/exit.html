@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Exit · Smart Parking{% endblock %}
+{% block content %}
+<div class="centered-form-page">
+<div class="card" style="max-width:560px;">
+  <h1>Vehicle exit</h1>
+  <p class="meta">Enter the plate number or use AI detection from a photo (Tesseract + optional YOLO weights).</p>
+  {% if error %}
+  <div class="alert alert-error" role="alert">{{ error }}</div>
+  {% endif %}
+  {% if result %}
+  <div class="alert alert-success" role="status">
+    <strong>Exit processed</strong><br>
+    Plate {{ result.plate_number }} · Slot {{ result.slot_freed }} freed<br>
+    Base ₹ {{ result.base_price }} · Extra ₹ {{ result.extra_charge }} ({{ result.extra_minutes }} min)<br>
+    <strong>Total billed</strong> ₹ {{ result.total_billed }}
+  </div>
+  {% endif %}
+  <form method="post" action="{{ url_for('exit_parking') }}" class="form-grid" style="max-width:none;" id="exit-form">
+    <label>Plate number
+      <input type="text" name="plate_number" id="plate_input" required maxlength="32" placeholder="KA01AB1234" autocomplete="off">
+    </label>
+    <button type="submit" class="btn btn-primary">Process exit</button>
+  </form>
+  <hr style="border-color:var(--surface2);margin:1.5rem 0;">
+  <h2>Detect plate from image</h2>
+  <p class="meta">Requires Tesseract on PATH (set TESSERACT_CMD in .env on Windows).</p>
+  <input type="file" id="plate_file" accept="image/*" class="btn btn-ghost" style="width:100%;">
+  <button type="button" class="btn btn-secondary" id="btn_detect" style="margin-top:0.5rem;">Run OCR / YOLO</button>
+  <p class="meta" id="detect_msg"></p>
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('btn_detect').addEventListener('click', async function () {
+  const f = document.getElementById('plate_file').files[0];
+  const msg = document.getElementById('detect_msg');
+  if (!f) { msg.textContent = 'Choose an image first.'; return; }
+  msg.textContent = 'Processing…';
+  const fd = new FormData();
+  fd.append('file', f);
+  try {
+    const r = await fetch('/detect-plate', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (j.plate_number) {
+      document.getElementById('plate_input').value = j.plate_number;
+      msg.textContent = 'Detected: ' + j.plate_number;
+    } else {
+      msg.textContent = j.message || 'Could not detect plate.';
+    }
+  } catch (e) {
+    msg.textContent = 'Request failed.';
+  }
+});
+</script>
+{% endblock %}

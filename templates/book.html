@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Book slot · Smart Parking{% endblock %}
+{% block content %}
+<div class="centered-form-page">
+<div class="card" style="max-width:520px;">
+  <h1>Book a slot</h1>
+  <p class="meta">Price per hour: ₹ {{ price_per_hour }} (charged from wallet when you book)</p>
+  <p class="meta slot-tier-legend">
+    <strong>Slot zones:</strong> <span class="tier-bike">B…</span> = bikes &amp; scooters only ·
+    <span class="tier-car">A…</span> = cars &amp; SUVs ·
+    <span class="tier-commercial">C…</span> = trucks &amp; tempo (cars and trucks share A + C; pick a free slot that fits your vehicle)
+  </p>
+  {% if error %}
+  <div class="alert alert-error" role="alert">{{ error }}</div>
+  {% endif %}
+  {% if not vehicles %}
+  <div class="alert alert-warn">Register a vehicle first. <a href="{{ url_for('vehicles_page') }}">Add vehicle</a></div>
+  {% elif not slots %}
+  <div class="alert alert-warn">No free slots right now.</div>
+  {% else %}
+  <form method="post" action="{{ url_for('create_booking') }}" class="form-grid" style="max-width:none;" id="book-form">
+    <label>Vehicle
+      <select name="vehicle_id" id="vehicle_id" required>
+        {% for v in vehicles %}
+        <option value="{{ v.id }}" {% if vehicles_with_active_booking is defined and v.id in vehicles_with_active_booking %}disabled title="Already has an active booking — extend or cancel on the dashboard"{% endif %}>{{ v.plate_number }}{% if v.label %} — {{ v.label }}{% endif %}{% if vehicles_with_active_booking is defined and v.id in vehicles_with_active_booking %} (active){% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Slot <span class="meta">(matches vehicle type)</span>
+      <select name="slot_id" id="slot_id" required disabled>
+        <option value="">Choose vehicle first</option>
+      </select>
+    </label>
+    <label>Duration (hours, max 168)
+      <input type="number" name="duration_hours" required min="0.25" max="168" step="0.25" value="2">
+    </label>
+    <button type="submit" class="btn btn-primary">Confirm booking</button>
+  </form>
+  {% endif %}
+</div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if vehicles and slots %}
+<script>
+(function () {
+  const vehicles = {{ vehicles_booking|tojson }};
+  const slots = {{ slots_booking|tojson }};
+  const vehicleSelect = document.getElementById('vehicle_id');
+  const slotSelect = document.getElementById('slot_id');
+  if (!vehicleSelect || !slotSelect || !vehicles.length || !slots.length) return;
+
+  function tierOk(tier, group) {
+    if (group === 'bike') return tier === 'bike';
+    return tier === 'car' || tier === 'commercial';
+  }
+
+  function refreshSlots() {
+    const vid = parseInt(vehicleSelect.value, 10);
+    const v = vehicles.find(function (x) { return x.id === vid; });
+    slotSelect.innerHTML = '';
+    if (!v) {
+      slotSelect.disabled = true;
+      slotSelect.innerHTML = '<option value="">Choose vehicle first</option>';
+      return;
+    }
+    const group = v.g;
+    const ok = slots.filter(function (s) { return tierOk(s.t, group); });
+    if (!ok.length) {
+      slotSelect.disabled = true;
+      slotSelect.innerHTML = '<option value="">No free slots for this vehicle type</option>';
+      return;
+    }
+    ok.forEach(function (s) {
+      const o = document.createElement('option');
+      o.value = String(s.id);
+      o.textContent = s.n;
+      slotSelect.appendChild(o);
+    });
+    slotSelect.disabled = false;
+  }
+
+  vehicleSelect.addEventListener('change', refreshSlots);
+  refreshSlots();
+})();
+</script>
+{% endif %}
+{% endblock %}

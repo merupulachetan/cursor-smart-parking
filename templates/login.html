@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Log in · Smart Parking{% endblock %}
+{% block content %}
+<div class="centered-form-page">
+<div class="card" style="max-width:440px;">
+  <h1>Log in</h1>
+  {% if error %}
+  <div class="alert alert-error" role="alert">{{ error }}</div>
+  {% endif %}
+  <form method="post" action="{{ url_for('login_submit') }}" class="form-grid">
+    <label>Email
+      <input type="email" name="email" required autocomplete="username" value="">
+    </label>
+    <label>Password
+      <input type="password" name="password" required autocomplete="current-password" minlength="1">
+    </label>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-primary">Log in</button>
+      <a class="btn btn-secondary" href="{{ url_for('register_page') }}">Create account</a>
+    </div>
+  </form>
+</div>
+</div>
+{% endblock %}

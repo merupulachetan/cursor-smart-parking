@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Predictions · Smart Parking{% endblock %}
+{% block content %}
+<div class="centered-form-page">
+  <div class="card centered-form-card--wide predictions-card" style="max-width:min(960px,100%);">
+    <h1>Booking demand forecast</h1>
+    <p class="meta">
+      Based on historical booking starts (<strong>completed</strong> and <strong>active</strong>).
+      Times in <strong>{{ tz_label }}</strong>. High demand if predicted ≥ <strong>{{ "%.2f"|format(threshold|float) }}</strong>.
+      The pie chart uses the same history: vehicle type from registration when set, otherwise slot zone (<strong>B</strong> = two-wheeler, <strong>A</strong> = car, <strong>C</strong> = commercial).
+    </p>
+
+    <div class="predictions-charts-grid">
+      <section class="predictions-chart-panel" aria-labelledby="forecast-heading">
+        <h2 id="forecast-heading">Next 6 hours (predicted)</h2>
+        {% if predictions %}
+        <div class="predictions-chart-wrap">
+          <canvas id="predictions-chart" aria-label="Predicted bookings chart"></canvas>
+        </div>
+        {% else %}
+        <div class="alert alert-warn" role="status">Not enough data to plot hourly forecast yet.</div>
+        {% endif %}
+      </section>
+
+      <section class="predictions-chart-panel" aria-labelledby="mix-heading">
+        <h2 id="mix-heading">Bookings by vehicle type</h2>
+        <p class="meta">All completed &amp; active records · pie chart</p>
+        {% if vehicle_mix %}
+        <div class="predictions-pie-shell">
+          <div class="predictions-chart-wrap predictions-chart-wrap--pie">
+            <canvas id="vehicle-mix-pie" aria-label="Vehicle mix pie chart"></canvas>
+          </div>
+        </div>
+        <ul class="predictions-mix-legend" aria-label="Counts by category">
+          {% for item in vehicle_mix %}
+          <li><strong>{{ item.label }}</strong> — {{ item.count }} booking{% if item.count != 1 %}s{% endif %}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="alert alert-warn" role="status">No booking history yet for a vehicle mix chart.</div>
+        {% endif %}
+      </section>
+    </div>
+
+    {% if predictions %}
+    <div class="predictions-table-wrap">
+      <h2 class="predictions-table-title">Hourly detail</h2>
+      <table class="predictions-table">
+        <thead>
+          <tr>
+            <th scope="col">Hour</th>
+            <th scope="col">Predicted bookings</th>
+            <th scope="col">Demand</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in predictions %}
+          <tr class="{% if p.predicted >= threshold %}predictions-row--high{% else %}predictions-row--low{% endif %}">
+            <td>{{ p.hour }}</td>
+            <td>{{ p.predicted }}</td>
+            <td>{{ p.demand }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <p class="meta" style="margin-top:1rem;">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">Back to dashboard</a>
+    </p>
+  </div>
+</div>
+<style>
+.predictions-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin: 1.25rem 0;
+}
+@media (min-width: 860px) {
+  .predictions-charts-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+}
+.predictions-chart-panel h2 { font-size: 1.05rem; margin: 0 0 0.35rem; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.predictions-chart-wrap { margin: 0.75rem 0; height: 260px; max-height: 280px; }
+.predictions-pie-shell {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.predictions-chart-wrap--pie {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  height: 280px;
+}
+.predictions-mix-legend {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.predictions-mix-legend li { margin-bottom: 0.35rem; }
+.predictions-table-title { font-size: 1rem; margin: 1.25rem 0 0.5rem; }
+.predictions-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; margin-top: 0.5rem; }
+.predictions-table th,
+.predictions-table td { padding: 0.65rem 0.75rem; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.predictions-table th { font-weight: 600; color: rgba(255,255,255,0.85); }
+.predictions-row--high td:last-child { color: #fbbf24; font-weight: 600; }
+.predictions-row--low td:last-child { color: #86efac; }
+.centered-form-card--wide { max-width: 520px; }
+.predictions-card.centered-form-card--wide { max-width: min(960px, calc(100vw - 2rem)); }
+</style>
+{% endblock %}
+{% block scripts %}
+{% if predictions or vehicle_mix %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (typeof Chart === 'undefined') return;
+  const grid = 'rgba(255,255,255,0.08)';
+  const tick = 'rgba(255,255,255,0.65)';
+
+  {% if predictions %}
+  (function () {
+    const labels = {{ chart_labels|tojson }};
+    const values = {{ chart_values|tojson }};
+    const threshold = {{ threshold|tojson }};
+    const ctx = document.getElementById('predictions-chart');
+    if (!ctx) return;
+    const purple = 'rgba(167, 139, 250, 0.75)';
+    const amber = 'rgba(251, 191, 36, 0.85)';
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Predicted bookings',
+          data: values,
+          backgroundColor: values.map(function (v) { return v >= threshold ? amber : purple; }),
+          borderColor: values.map(function (v) { return v >= threshold ? 'rgba(251, 191, 36, 1)' : 'rgba(167, 139, 250, 1)'; }),
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: tick } } },
+        scales: {
+          x: { ticks: { color: tick }, grid: { color: grid } },
+          y: { beginAtZero: true, ticks: { color: tick, precision: 0 }, grid: { color: grid } },
+        },
+      },
+    });
+  })();
+  {% endif %}
+
+  {% if vehicle_mix %}
+  (function () {
+    const pieLabels = {{ pie_labels|tojson }};
+    const pieValues = {{ pie_values|tojson }};
+    const ctx = document.getElementById('vehicle-mix-pie');
+    if (!ctx || !pieLabels.length) return;
+    const colors = [
+      'rgba(167, 139, 250, 0.88)',
+      'rgba(96, 165, 250, 0.88)',
+      'rgba(52, 211, 153, 0.88)',
+      'rgba(251, 191, 36, 0.88)',
+      'rgba(248, 113, 113, 0.88)',
+      'rgba(196, 181, 253, 0.88)',
+      'rgba(45, 212, 191, 0.88)',
+    ];
+    const bg = pieLabels.map(function (_, i) { return colors[i % colors.length]; });
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: pieLabels,
+        datasets: [{
+          data: pieValues,
+          backgroundColor: bg,
+          borderColor: 'rgba(15, 23, 42, 0.55)',
+          borderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        radius: '72%',
+        layout: { padding: 8 },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: tick, padding: 12, boxWidth: 12, usePointStyle: true },
+          },
+        },
+      },
+    });
+  })();
+  {% endif %}
+})();
+</script>
+{% endif %}
+{% endblock %}
